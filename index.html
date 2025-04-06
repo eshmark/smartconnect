@@ -71,24 +71,58 @@
   }
 
   function renderDevices() {
-    container.innerHTML = '';
-    const devices = getDevices();
-    devices.forEach(device => {
+  container.innerHTML = '';
+  const devices = getDevices();
+
+  if (devices.length === 0) {
+    container.innerHTML = '<p>No devices added yet</p>';
+    return;
+  }
+
+  devices.forEach(device => {
+    const wrapper = document.createElement('div');
+    wrapper.style.margin = '10px';
+
+    const label = document.createElement('div');
+    label.textContent = `${device.name} (${device.type})`;
+    label.style.marginBottom = '5px';
+    wrapper.appendChild(label);
+
+    if (device.type === 'button') {
       const btn = document.createElement('button');
       btn.className = 'device-btn';
-      btn.innerText = `🔌 ${device.name} (${device.type})`;
+      btn.innerText = `Press ${device.name}`;
       btn.onclick = () => {
-        let msg = `/${device.type} ${device.id}`;
-        Telegram.WebApp.sendData(msg);
-        Telegram.WebApp.close(); // optional
+        Telegram.WebApp.sendData(`/button ${device.id}`);
       };
-      container.appendChild(btn);
-    });
-
-    if (devices.length === 0) {
-      container.innerHTML = '<p>No devices added yet</p>';
+      wrapper.appendChild(btn);
     }
-  }
+
+    if (device.type === 'toggle') {
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.onchange = () => {
+        const value = toggle.checked ? 'on' : 'off';
+        Telegram.WebApp.sendData(`/toggle ${device.id} ${value}`);
+      };
+      wrapper.appendChild(toggle);
+    }
+
+    if (device.type === 'slider') {
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = 0;
+      slider.max = 100;
+      slider.value = 50;
+      slider.onchange = () => {
+        Telegram.WebApp.sendData(`/slider ${device.id} ${slider.value}`);
+      };
+      wrapper.appendChild(slider);
+    }
+
+    container.appendChild(wrapper);
+  });
+}
 
   function addDevice() {
     const name = document.getElementById('deviceName').value.trim();
