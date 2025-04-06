@@ -1,16 +1,105 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP Door Control</title>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP Device Control</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      text-align: center;
+      padding: 20px;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    .device-btn, .add-btn {
+      display: block;
+      width: 80%;
+      margin: 10px auto;
+      padding: 12px;
+      font-size: 16px;
+      background-color: #0088cc;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    input {
+      padding: 10px;
+      width: 60%;
+      margin: 10px;
+    }
+    select {
+      padding: 10px;
+      width: 70%;
+      margin: 10px;
+    }
+  </style>
 </head>
 <body>
   <h2>My Devices</h2>
-  <div id="deviceList"></div>
+  <div id="device-buttons"></div>
 
-  <script src="script.js"></script>
+  <hr />
+  <h3>Add Device</h3>
+  <input id="deviceName" placeholder="Device Name" />
+  <input id="deviceId" placeholder="Device ID" />
+  <select id="deviceType">
+    <option value="toggle">Toggle</option>
+    <option value="button">Button</option>
+    <option value="slider">Slider</option>
+  </select>
+  <button class="add-btn" onclick="addDevice()">➕ Add Device</button>
+
+  <script>
+    Telegram.WebApp.ready();
+
+    const container = document.getElementById('device-buttons');
+
+    function getDevices() {
+      return JSON.parse(localStorage.getItem('myDevices') || '[]');
+    }
+
+    function saveDevices(devices) {
+      localStorage.setItem('myDevices', JSON.stringify(devices));
+    }
+
+    function renderDevices() {
+      container.innerHTML = '';
+      const devices = getDevices();
+      devices.forEach(device => {
+        const btn = document.createElement('button');
+        btn.className = 'device-btn';
+        btn.innerText = `🔌 ${device.name}`;
+        btn.onclick = () => {
+          const msg = `/${device.type} ${device.id}`;
+          Telegram.WebApp.sendData(msg);
+          Telegram.WebApp.close(); // Optional
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function addDevice() {
+      const name = document.getElementById('deviceName').value.trim();
+      const id = document.getElementById('deviceId').value.trim();
+      const type = document.getElementById('deviceType').value;
+
+      if (!name || !id) {
+        alert("Please fill in name and ID");
+        return;
+      }
+
+      const devices = getDevices();
+      devices.push({ name, id, type });
+      saveDevices(devices);
+      renderDevices();
+      Telegram.WebApp.sendData(`/register ${id}`); // Optional: notify bot
+    }
+
+    renderDevices();
+  </script>
 </body>
 </html>
