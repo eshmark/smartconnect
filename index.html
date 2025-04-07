@@ -71,26 +71,53 @@
   <script>
     Telegram.WebApp.ready();
 
-    const container = document.getElementById('device-buttons');
-
     function getDevices() {
+      let data = localStorage.getItem("myDevices");
       try {
-        return JSON.parse(localStorage.getItem('myDevices')) || [];
+        return data ? JSON.parse(data) : [];
       } catch (e) {
         return [];
       }
     }
 
     function saveDevices(devices) {
-      localStorage.setItem('myDevices', JSON.stringify(devices));
+      localStorage.setItem("myDevices", JSON.stringify(devices));
+    }
+
+    function addDevice() {
+      const name = document.getElementById("deviceName").value.trim();
+      const id = document.getElementById("deviceId").value.trim();
+      const type = document.getElementById("deviceType").value;
+
+      if (!name || !id) {
+        alert("Please fill in both Device Name and ID.");
+        return;
+      }
+
+      const devices = getDevices();
+      if (devices.find(d => d.id === id)) {
+        alert("Device with this ID already exists.");
+        return;
+      }
+
+      devices.push({ name, id, type });
+      saveDevices(devices);
+      renderDevices();
+
+      document.getElementById("deviceName").value = '';
+      document.getElementById("deviceId").value = '';
+      document.getElementById("deviceType").value = 'toggle';
+
+      Telegram.WebApp.sendData(`/register ${id}`);
     }
 
     function renderDevices() {
-      container.innerHTML = '';
       const devices = getDevices();
+      const container = document.getElementById("device-buttons");
+      container.innerHTML = '';
 
       if (devices.length === 0) {
-        container.innerHTML = '<p>No devices added yet</p>';
+        container.innerHTML = '<p>No devices added yet.</p>';
         return;
       }
 
@@ -150,34 +177,6 @@
 
         container.appendChild(wrapper);
       });
-    }
-
-    function addDevice() {
-      const name = document.getElementById('deviceName').value.trim();
-      const id = document.getElementById('deviceId').value.trim();
-      const type = document.getElementById('deviceType').value;
-
-      if (!name || !id) {
-        alert("Please fill in both Device Name and ID.");
-        return;
-      }
-
-      const devices = getDevices();
-      const alreadyExists = devices.find(d => d.id === id);
-      if (alreadyExists) {
-        alert("This device ID already exists.");
-        return;
-      }
-
-      devices.push({ name, id, type });
-      saveDevices(devices);
-      renderDevices();
-
-      document.getElementById('deviceName').value = '';
-      document.getElementById('deviceId').value = '';
-      document.getElementById('deviceType').value = 'toggle';
-
-      Telegram.WebApp.sendData(`/register ${id}`);
     }
 
     renderDevices();
