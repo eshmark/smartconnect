@@ -1,159 +1,186 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>ESP Device Control</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <meta charset="UTF-8">
+  <title>Smart Door Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      text-align: center;
+      font-family: sans-serif;
       padding: 20px;
+      background: #f9f9f9;
     }
+
     h2 {
+      text-align: center;
       margin-bottom: 20px;
     }
-    .device-btn, .add-btn {
-      display: block;
-      width: 80%;
-      margin: 10px auto;
+
+    #device-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .device-btn {
+      width: 100%;
       padding: 12px;
-      font-size: 16px;
-      background-color: #0088cc;
+      background-color: #3399ff;
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
+      font-size: 16px;
       cursor: pointer;
     }
-    input {
+
+    input[type="text"], select {
+      width: 100%;
       padding: 10px;
-      width: 60%;
-      margin: 10px;
+      margin: 5px 0 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
     }
-    select {
-      padding: 10px;
-      width: 70%;
-      margin: 10px;
+
+    button.add {
+      background-color: #28a745;
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      width: 100%;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
-  <h2>My Devices</h2>
-  <div id="device-buttons"></div>
+  <h2>Smart Door Control</h2>
 
-  <hr />
-  <h3>Add Device</h3>
-  <input id="deviceName" placeholder="Device Name" />
-  <input id="deviceId" placeholder="Device ID" />
+  <input type="text" id="deviceName" placeholder="Device Name">
+  <input type="text" id="deviceId" placeholder="Device ID">
   <select id="deviceType">
     <option value="toggle">Toggle</option>
     <option value="button">Button</option>
     <option value="slider">Slider</option>
   </select>
-  <button class="add-btn" onclick="addDevice()">➕ Add Device</button>
+  <button class="add" onclick="addDevice()">Add Device</button>
 
-<script>
-  Telegram.WebApp.ready();
+  <div id="device-buttons"></div>
 
-  const container = document.getElementById('device-buttons');
+  <script>
+    Telegram.WebApp.ready();
 
-  function getDevices() {
-    try {
-      return JSON.parse(localStorage.getItem('myDevices')) || [];
-    } catch (e) {
-      return [];
-    }
-  }
+    const container = document.getElementById('device-buttons');
 
-  function saveDevices(devices) {
-    localStorage.setItem('myDevices', JSON.stringify(devices));
-  }
-
-  function renderDevices() {
-  container.innerHTML = '';
-  const devices = getDevices();
-
-  if (devices.length === 0) {
-    container.innerHTML = '<p>No devices added yet</p>';
-    return;
-  }
-
-  devices.forEach(device => {
-    const wrapper = document.createElement('div');
-    wrapper.style.margin = '10px';
-
-    const label = document.createElement('div');
-    label.textContent = `${device.name} (${device.type})`;
-    label.style.marginBottom = '5px';
-    wrapper.appendChild(label);
-
-    if (device.type === 'button') {
-      const btn = document.createElement('button');
-      btn.className = 'device-btn';
-      btn.innerText = `Press ${device.name}`;
-      btn.onclick = () => {
-        Telegram.WebApp.sendData(`/button ${device.id}`);
-      };
-      wrapper.appendChild(btn);
+    function getDevices() {
+      try {
+        return JSON.parse(localStorage.getItem('myDevices')) || [];
+      } catch (e) {
+        return [];
+      }
     }
 
-    if (device.type === 'toggle') {
-      const toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.onchange = () => {
-        const value = toggle.checked ? 'on' : 'off';
-        Telegram.WebApp.sendData(`/toggle ${device.id} ${value}`);
-      };
-      wrapper.appendChild(toggle);
+    function saveDevices(devices) {
+      localStorage.setItem('myDevices', JSON.stringify(devices));
     }
 
-    if (device.type === 'slider') {
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = 0;
-      slider.max = 100;
-      slider.value = 50;
-      slider.onchange = () => {
-        Telegram.WebApp.sendData(`/slider ${device.id} ${slider.value}`);
-      };
-      wrapper.appendChild(slider);
+    function renderDevices() {
+      container.innerHTML = '';
+      const devices = getDevices();
+
+      if (devices.length === 0) {
+        container.innerHTML = '<p>No devices added yet</p>';
+        return;
+      }
+
+      devices.forEach(device => {
+        const wrapper = document.createElement('div');
+        wrapper.style.margin = '10px';
+
+        const label = document.createElement('div');
+        label.textContent = `${device.name} (${device.type})`;
+        label.style.marginBottom = '5px';
+        wrapper.appendChild(label);
+
+        if (device.type === 'button') {
+          const btn = document.createElement('button');
+          btn.className = 'device-btn';
+          btn.innerText = `Press ${device.name}`;
+          btn.onclick = () => {
+            Telegram.WebApp.sendData(`/button ${device.id}`);
+          };
+          wrapper.appendChild(btn);
+        }
+
+        if (device.type === 'toggle') {
+          const toggleWrapper = document.createElement('div');
+          toggleWrapper.style.display = 'flex';
+          toggleWrapper.style.alignItems = 'center';
+          toggleWrapper.style.gap = '10px';
+
+          const toggle = document.createElement('input');
+          toggle.type = 'checkbox';
+
+          const statusLabel = document.createElement('span');
+          statusLabel.textContent = 'Off';
+
+          toggle.onchange = () => {
+            const value = toggle.checked ? 'on' : 'off';
+            statusLabel.textContent = toggle.checked ? 'On' : 'Off';
+            Telegram.WebApp.sendData(`/toggle ${device.id} ${value}`);
+          };
+
+          toggleWrapper.appendChild(toggle);
+          toggleWrapper.appendChild(statusLabel);
+          wrapper.appendChild(toggleWrapper);
+        }
+
+        if (device.type === 'slider') {
+          const slider = document.createElement('input');
+          slider.type = 'range';
+          slider.min = 0;
+          slider.max = 100;
+          slider.value = 50;
+          slider.onchange = () => {
+            Telegram.WebApp.sendData(`/slider ${device.id} ${slider.value}`);
+          };
+          wrapper.appendChild(slider);
+        }
+
+        container.appendChild(wrapper);
+      });
     }
 
-    container.appendChild(wrapper);
-  });
-}
+    function addDevice() {
+      const name = document.getElementById('deviceName').value.trim();
+      const id = document.getElementById('deviceId').value.trim();
+      const type = document.getElementById('deviceType').value;
 
-  function addDevice() {
-    const name = document.getElementById('deviceName').value.trim();
-    const id = document.getElementById('deviceId').value.trim();
-    const type = document.getElementById('deviceType').value;
+      if (!name || !id) {
+        alert("Please fill in both Device Name and ID.");
+        return;
+      }
 
-    if (!name || !id) {
-      alert("Please fill in both Device Name and ID.");
-      return;
+      const devices = getDevices();
+      const alreadyExists = devices.find(d => d.id === id);
+      if (alreadyExists) {
+        alert("This device ID already exists.");
+        return;
+      }
+
+      devices.push({ name, id, type });
+      saveDevices(devices);
+      renderDevices();
+
+      document.getElementById('deviceName').value = '';
+      document.getElementById('deviceId').value = '';
+      document.getElementById('deviceType').value = 'toggle';
+
+      Telegram.WebApp.sendData(`/register ${id}`);
     }
 
-    const devices = getDevices();
-    const alreadyExists = devices.find(d => d.id === id);
-    if (alreadyExists) {
-      alert("This device ID already exists.");
-      return;
-    }
-
-    devices.push({ name, id, type });
-    saveDevices(devices);
     renderDevices();
-    document.getElementById('deviceName').value = '';
-    document.getElementById('deviceId').value = '';
-    document.getElementById('deviceType').value = 'toggle';
-
-    // Optionally notify bot (ESP/Telegram backend)
-    Telegram.WebApp.sendData(`/register ${id}`);
-  }
-
-  renderDevices();
-</script>
-
+  </script>
 </body>
 </html>
