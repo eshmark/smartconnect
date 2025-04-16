@@ -1,268 +1,77 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>ESP-01S Control Panel</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
+WiFiClientSecure client;
+
+const int switchPin = 0;  // GPIO0
+bool switchState = LOW;
+unsigned long lastPoll = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(switchPin, INPUT_PULLUP);
+
+  WiFi.begin(ssid, password);
+  client.setInsecure();  // Skip certificate check
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected");
+  sendTelegramMessage("ESP-01S connected to WiFi.");
+}
+
+void loop() {
+  bool currentState = digitalRead(switchPin) == LOW;  // Active LOW
+  if (currentState && !switchState) {
+    sendTelegramMessage("Connector Switch ON");
+  }
+
+  switchState = currentState;
+
+  if (switchState && millis() - lastPoll >= 2000) {
+    checkTelegramCommands();
+    lastPoll = millis();
+  }
+}
+
+void sendTelegramMessage(const String& message) {
+  if (client.connect("api.telegram.org", 443)) {
+    String url = "/bot" + String(botToken) + "/sendMessage?chat_id=" + chatId + "&text=" + message;
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: api.telegram.org\r\n" +
+                 "Connection: close\r\n\r\n");
+    delay(500);
+    while (client.available()) client.read();  // Clear response
+    client.stop();
+  }
+}
+
+void checkTelegramCommands() {
+  if (!client.connect("api.telegram.org", 443)) return;
+
+  String url = "/bot" + String(botToken) + "/getUpdates?timeout=5";
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: api.telegram.org\r\n" +
+               "Connection: close\r\n\r\n");
+
+  String payload;
+  while (client.connected() || client.available()) {
+    if (client.available()) {
+      payload += client.readStringUntil('\n');
     }
+  }
 
-    .container {
-      width: 100%;
-      max-width: 1200px;
+  client.stop();
+
+  DynamicJsonDocument doc(2048);
+  DeserializationError error = deserializeJson(doc, payload);
+  if (error) return;
+
+  JsonArray results = doc["result"];
+  for (JsonObject update : results) {
+    String text = update["message"]["text"] | "";
+    if (text.indexOf(deviceId) != -1 && text.indexOf("press on") != -1) {
+      sendTelegramMessage("okay done");
     }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 60px;
-    }
-
-    .device-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-    }
-
-    .device {
-      border: 2px solid #ccc;
-      border-radius: 12px;
-      padding: 16px;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .device h2 {
-      margin-bottom: 15px;
-      font-size: 1.2em;
-    }
-
-    .form-section {
-      background: #fff;
-      border: 2px solid #aaa;
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 40px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .form-section input,
-    .form-section select,
-    .form-section button {
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #aaa;
-      font-size: 1em;
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 50px;
-      height: 26px;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider-toggle {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0;
-      right: 0; bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 28px;
-    }
-
-    .slider-toggle:before {
-      position: absolute;
-      content: "";
-      height: 20px;
-      width: 20px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider-toggle {
-      background-color: #4CAF50;
-    }
-
-    input:checked + .slider-toggle:before {
-      transform: translateX(24px);
-    }
-
-    .control-row {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      margin: 8px;
-      background: #fdfdfd;
-    }
-
-    .control-row input[type="range"] {
-      width: 80px;
-    }
-
-    .control-row button {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    .control-group {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="form-section">
-      <input type="text" id="deviceName" placeholder="Device Name">
-      <input type="text" id="deviceID" placeholder="Device ID">
-      <select id="deviceType">
-        <option value="smartPlug">Smart Plug</option>
-        <option value="smartBot">Smart Bot</option>
-        <option value="alarm">Alarm Module</option>
-      </select>
-      <button onclick="addDevice()">Add Device</button>
-    </div>
-
-    <h1>My Devices</h1>
-    <div id="deviceList" class="device-list"></div>
-  </div>
-
-  <script>
-    const deviceList = document.getElementById("deviceList");
-    const tg = window.Telegram.WebApp;
-
-    function createToggleControl() {
-      return `
-        <div class="control-row">
-          <label class="switch">
-            <input type="checkbox">
-            <span class="slider-toggle"></span>
-          </label>
-        </div>
-      `;
-    }
-
-    function createFullControl() {
-      return `
-        <div class="control-row">
-          <label class="switch">
-            <input type="checkbox">
-            <span class="slider-toggle"></span>
-          </label>
-          <input type="range" min="0" max="100">
-          <button>Press</button>
-        </div>
-      `;
-    }
-
-    function createActionButton() {
-      return `
-        <div class="control-row">
-          <button>Action</button>
-        </div>
-      `;
-    }
-
-    function addDevice() {
-      const name = document.getElementById('deviceName').value.trim();
-      const id = document.getElementById('deviceID').value.trim();
-      const type = document.getElementById('deviceType').value;
-
-      if (!name || !id) {
-        alert("Please fill in both name and ID.");
-        return;
-      }
-
-      const device = document.createElement("div");
-      device.className = "device";
-      device.innerHTML = `<h2>${name}</h2><div class="control-group"></div>`;
-      const controlGroup = device.querySelector(".control-group");
-
-      if (type === "smartPlug") {
-        controlGroup.innerHTML = `
-          ${createToggleControl()}
-          ${createToggleControl()}
-          ${createToggleControl()}
-        `;
-      } else if (type === "smartBot") {
-        controlGroup.innerHTML = `
-          ${createFullControl()}
-          ${createFullControl()}
-          ${createFullControl()}
-          ${createFullControl()}
-        `;
-      } else if (type === "alarm") {
-        controlGroup.innerHTML = createActionButton();
-      }
-
-      // Add device to page
-      deviceList.appendChild(device);
-
-      // Save device info
-      const saved = JSON.parse(localStorage.getItem("devices") || "[]");
-      saved.push({ name, id, type });
-      localStorage.setItem("devices", JSON.stringify(saved));
-
-      // Send to Telegram Bot
-      if (tg && tg.sendData) {
-        tg.sendData(JSON.stringify({ action: "add_device", name, id, type }));
-      }
-
-      // Clear inputs
-      document.getElementById("deviceName").value = "";
-      document.getElementById("deviceID").value = "";
-    }
-
-    function loadDevices() {
-      const saved = JSON.parse(localStorage.getItem("devices") || "[]");
-      for (const dev of saved) {
-        document.getElementById("deviceName").value = dev.name;
-        document.getElementById("deviceID").value = dev.id;
-        document.getElementById("deviceType").value = dev.type;
-        addDevice();  // re-render
-      }
-      // Clear prefilled fields
-      document.getElementById("deviceName").value = "";
-      document.getElementById("deviceID").value = "";
-    }
-
-    // Telegram init
-    if (tg) {
-      tg.expand();
-    }
-
-    window.onload = loadDevices;
-  </script>
-</body>
-</html>
+  }
+}
