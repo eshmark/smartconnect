@@ -1,276 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>ESP-01S Device Control</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP-01S Control</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
-      padding: 20px;
-    }
-
-    #container {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      justify-content: center;
-    }
-
-    .device-box {
-      border: 2px solid #333;
-      border-radius: 10px;
-      padding: 15px;
-      background: white;
-      min-width: 300px;
-      max-width: 320px;
-      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
-      position: relative;
-    }
-
-    .device-header {
-      font-weight: bold;
-      font-size: 18px;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-
-    .controls.smart-plug {
+      font-family: sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      margin-top: 50px;
     }
-
-    .controls.smart-plug .row {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .controls.smart-bot,
-    .controls.alarm {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      justify-items: center;
-    }
-
-    .control-box {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-      background-color: #f9f9f9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 100px;
-    }
-
-    .add-form {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-
-    .add-form input,
-    .add-form select,
-    .add-form button {
-      padding: 8px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-
-    .toggle-switch {
-      appearance: none;
-      width: 40px;
-      height: 20px;
-      background-color: #ccc;
-      border-radius: 20px;
-      position: relative;
-      cursor: pointer;
-    }
-
-    .toggle-switch:checked {
-      background-color: #4CAF50;
-    }
-
-    .toggle-switch::before {
-      content: "";
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      background-color: white;
-      border-radius: 50%;
-      top: 1px;
-      left: 1px;
-      transition: 0.2s;
-    }
-
-    .toggle-switch:checked::before {
-      transform: translateX(20px);
-    }
-
-    .slider {
-      width: 100px;
-    }
-
-    .press-button {
-      padding: 5px 10px;
-      border: none;
-      background-color: #2196F3;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .remove-button {
-      position: absolute;
-      top: 5px;
-      right: 10px;
-      border: none;
-      background: transparent;
+    button {
+      padding: 15px 30px;
+      margin: 10px;
       font-size: 18px;
-      cursor: pointer;
-      color: #999;
     }
   </style>
 </head>
 <body>
+  <h2>ESP-01S Control</h2>
+  <p id="status">🔄 Connecting to MQTT...</p>
+  <button onclick="sendCommand('on')">Turn ON</button>
+  <button onclick="sendCommand('off')">Turn OFF</button>
 
-<h2 style="text-align: center;">ESP-01S Device Control Panel</h2>
-
-<div class="add-form">
-  <input type="text" id="deviceName" placeholder="Device Name">
-  <input type="text" id="deviceId" placeholder="Device ID">
-  <select id="deviceType">
-    <option value="smart-plug">Smart Plug</option>
-    <option value="smart-bot">Smart Bot</option>
-    <option value="alarm">Alarm</option>
-  </select>
-  <button onclick="addDevice()">Add Device</button>
-</div>
-
-<div id="container"></div>
-
-<script>
-  const tg = window.Telegram?.WebApp || { sendData: console.log };
-  const container = document.getElementById("container");
-  let devices = JSON.parse(localStorage.getItem("devices") || "[]");
-
-  function saveDevices() {
-    localStorage.setItem("devices", JSON.stringify(devices));
-  }
-
-  function addDevice() {
-    const name = document.getElementById("deviceName").value.trim();
-    const id = document.getElementById("deviceId").value.trim();
-    const type = document.getElementById("deviceType").value;
-
-    if (!name || !id) return alert("Device name and ID are required.");
-
-    const device = { name, id, type };
-    devices.push(device);
-    saveDevices();
-    renderDevice(device);
-    document.getElementById("deviceName").value = "";
-    document.getElementById("deviceId").value = "";
-  }
-
-  function renderDevice({ name, id, type }) {
-    const box = document.createElement("div");
-    box.className = "device-box";
-
-    const header = document.createElement("div");
-    header.className = "device-header";
-    header.textContent = name;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "remove-button";
-    removeBtn.textContent = "×";
-    removeBtn.onclick = () => {
-      devices = devices.filter(d => d.id !== id);
-      saveDevices();
-      box.remove();
-    };
-
-    const controls = document.createElement("div");
-    controls.className = `controls ${type}`;
-
-    if (type === "smart-plug") {
-      const row1 = document.createElement("div");
-      row1.className = "row";
-      const row2 = document.createElement("div");
-      row2.className = "row";
-      row1.appendChild(createControlGroup(id, ["toggle"]));
-      row1.appendChild(createControlGroup(id, ["toggle"]));
-      row2.appendChild(createControlGroup(id, ["toggle"]));
-      controls.appendChild(row1);
-      controls.appendChild(row2);
-    } else if (type === "smart-bot") {
-      for (let i = 0; i < 4; i++) controls.appendChild(createControlGroup(id, ["toggle", "slider", "press"]));
-    } else if (type === "alarm") {
-      controls.appendChild(createControlGroup(id, ["press"], "Action"));
-    }
-
-    box.appendChild(removeBtn);
-    box.appendChild(header);
-    box.appendChild(controls);
-    container.appendChild(box);
-  }
-
-  function createControlGroup(id, types, pressLabel = "Press") {
-    const group = document.createElement("div");
-    group.className = "control-box";
-
-    if (types.includes("toggle")) {
-      const toggle = document.createElement("input");
-      toggle.type = "checkbox";
-      toggle.className = "toggle-switch";
-      toggle.onchange = () => sendCommand(id, toggle.checked ? "toggle on" : "toggle off");
-      group.appendChild(toggle);
-    }
-
-    if (types.includes("slider")) {
-      const slider = document.createElement("input");
-      slider.type = "range";
-      slider.min = 0;
-      slider.max = 100;
-      slider.className = "slider";
-      slider.oninput = () => {
-        const value = Math.round(slider.value / 20);
-        sendCommand(id, `slider ${value}`);
-      };
-      group.appendChild(slider);
-    }
-
-    if (types.includes("press")) {
-      const btn = document.createElement("button");
-      btn.className = "press-button";
-      btn.textContent = pressLabel;
-      btn.onclick = () => {
-        sendCommand(id, "press on");
-        setTimeout(() => sendCommand(id, "press off"), 300);
-      };
-      group.appendChild(btn);
-    }
-
-    return group;
-  }
-
-  function sendCommand(id, command) {
-    tg.sendData(JSON.stringify({ deviceId: id, command }));
-  }
-
-  // Load saved devices
-  devices.forEach(renderDevice);
-</script>
-
+  <script src="script.js"></script>
 </body>
 </html>
