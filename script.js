@@ -2,8 +2,8 @@
 const broker = "wss://vaa18635.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const topic = "device/vaa001/cmd";  // change to your unique device topic
 const options = {
-  username: "your_emqx_username",
-  password: "your_emqx_password",
+  username: "can101",
+  password: "402340",
   reconnectPeriod: 1000
 };
 
