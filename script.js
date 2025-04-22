@@ -1,26 +1,28 @@
-Telegram.WebApp.ready();
-Telegram.WebApp.expand(); // optional fullscreen
+// MQTT over WebSocket configuration
+const broker = "wss://vaa18635.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const topic = "device/vaa001/cmd";  // change to your unique device topic
+const options = {
+  username: "your_emqx_username",
+  password: "your_emqx_password",
+  reconnectPeriod: 1000
+};
 
-const userDevices = [
-  { id: "device1", name: "Main Door" },
-  { id: "device2", name: "Back Door" }
-];
+const client = mqtt.connect(broker, options);
 
-const container = document.getElementById("deviceList");
-
-userDevices.forEach(device => {
-  const div = document.createElement("div");
-  div.className = "device";
-  div.innerHTML = `
-    <h3>${device.name}</h3>
-    <button onclick="sendCommand('${device.id}', 'on')">ON</button>
-    <button onclick="sendCommand('${device.id}', 'off')">OFF</button>
-  `;
-  container.appendChild(div);
+client.on("connect", () => {
+  document.getElementById("status").innerText = "✅ Connected to MQTT broker";
 });
 
-function sendCommand(deviceId, action) {
-  const command = `${action} ${deviceId}`;
-  Telegram.WebApp.sendData(command); // sent to bot
-  alert(`Sent: ${command}`);
+client.on("error", (err) => {
+  console.error("MQTT Error:", err);
+  document.getElementById("status").innerText = "❌ MQTT connection failed";
+});
+
+function sendCommand(command) {
+  if (client.connected) {
+    client.publish(topic, command);
+    document.getElementById("status").innerText = `📤 Sent: ${command}`;
+  } else {
+    document.getElementById("status").innerText = "❌ Not connected to broker";
+  }
 }
