@@ -1,5 +1,5 @@
 // MQTT over WebSocket configuration
-const broker = "wss://vaa18635.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const broker = "wss://va1de099.ala.us-east-1.emqxsl.com:8084/mqtt";
 const topic = "device/vaa001/cmd";  // change to your unique device topic
 const options = {
   username: "can101",
